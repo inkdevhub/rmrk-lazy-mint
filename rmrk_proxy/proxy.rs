@@ -78,10 +78,10 @@ mod rmrk_proxy {
             instance
         }
 
+        /// Mints a token on proxied RMRK contract.
         #[ink(message, payable)]
         #[modifiers(non_reentrant)]
         pub fn mint(&mut self) -> Result<()> {
-            const GAS_LIMIT: u64 = 5_000_000_000;
             const MAX_ASSETS: u32 = 255;
 
             let transferred_value = Self::env().transferred_value();
@@ -92,24 +92,23 @@ mod rmrk_proxy {
 
             let total_assets = build_call::<DefaultEnvironment>()
                 .call(self.proxy.rmrk_contract.unwrap())
-                .gas_limit(GAS_LIMIT)
                 .exec_input(ExecutionInput::new(Selector::new(ink::selector_bytes!(
                     "MultiAsset::total_assets"
                 ))))
                 .returns::<u32>()
                 .try_invoke()
+                .unwrap()
                 .unwrap();
-            ensure!(total_assets.unwrap() > 0, ProxyError::NoAssetsDefined);
+            ensure!(total_assets > 0, ProxyError::NoAssetsDefined);
             // This is temporary since current pseudo random generator is not working with big numbers.
             ensure!(
-                total_assets.unwrap() <= MAX_ASSETS,
+                total_assets <= MAX_ASSETS,
                 ProxyError::TooManyAssetsDefined
             );
 
             // TODO check why the call is failing silently when no or invalid transferred value is provided.
             let mint_result = build_call::<DefaultEnvironment>()
                 .call(self.proxy.rmrk_contract.unwrap())
-                .gas_limit(GAS_LIMIT)
                 .transferred_value(transferred_value)
                 .exec_input(ExecutionInput::new(Selector::new(ink::selector_bytes!(
                     "MintingLazy::mint"
@@ -123,7 +122,6 @@ mod rmrk_proxy {
 
             let token_id = build_call::<DefaultEnvironment>()
                 .call(self.proxy.rmrk_contract.unwrap())
-                .gas_limit(GAS_LIMIT)
                 .exec_input(ExecutionInput::new(Selector::new(ink::selector_bytes!(
                     "PSP34::total_supply"
                 ))))
@@ -132,10 +130,9 @@ mod rmrk_proxy {
                 .unwrap()
                 .unwrap();
 
-            let asset_id = self.get_pseudo_random((total_assets.unwrap() - 1) as u8) + 1;
+            let asset_id = self.get_pseudo_random((total_assets - 1) as u8) + 1;
             let add_asset_result = build_call::<DefaultEnvironment>()
                 .call(self.proxy.rmrk_contract.unwrap())
-                .gas_limit(GAS_LIMIT)
                 .exec_input(
                     ExecutionInput::new(Selector::new(ink::selector_bytes!(
                         "MultiAsset::add_asset_to_token"
@@ -152,7 +149,6 @@ mod rmrk_proxy {
             let caller = Self::env().caller();
             let transfer_token_result = build_call::<DefaultEnvironment>()
                 .call(self.proxy.rmrk_contract.unwrap())
-                .gas_limit(GAS_LIMIT)
                 .exec_input(
                     ExecutionInput::new(Selector::new(ink::selector_bytes!("PSP34::transfer")))
                         .push_arg(caller)
@@ -167,21 +163,25 @@ mod rmrk_proxy {
             Ok(())
         }
 
+        /// Gets a RMRK contract address.
         #[ink(message)]
         pub fn rmrk_contract_address(&self) -> AccountId {
             self.proxy.rmrk_contract.unwrap()
         }
 
+        /// Gets a catalog contract address.
         #[ink(message)]
         pub fn catalog_contract_address(&self) -> AccountId {
             self.proxy.catalog_contract.unwrap()
         }
 
+        /// Gets a minting price.
         #[ink(message)]
         pub fn mint_price(&self) -> Balance {
             self.proxy.mint_price
         }
 
+        /// Sets a RMRK contract address.
         #[ink(message)]
         #[modifiers(only_owner)]
         pub fn set_rmrk_contract_address(&mut self, new_contract_address: AccountId) -> Result<()> {
@@ -189,6 +189,7 @@ mod rmrk_proxy {
             Ok(())
         }
 
+        /// Sets a catalog contract address.
         #[ink(message)]
         #[modifiers(only_owner)]
         pub fn set_catalog_contract_address(
@@ -199,6 +200,7 @@ mod rmrk_proxy {
             Ok(())
         }
 
+        /// Sets a minting price.
         #[ink(message)]
         #[modifiers(only_owner)]
         pub fn set_mint_price(&mut self, new_mint_price: Balance) -> Result<()> {
