@@ -1,0 +1,35 @@
+[package]
+name = "rmrk_proxy"
+version = "0.1.0"
+authors = ["[Bobo] <[your_email]>"]
+edition = "2021"
+
+[dependencies]
+ink = { version = "4.1.0", default-features = false }
+
+scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
+scale-info = { version = "2.3", default-features = false, features = ["derive"], optional = true }
+catalog_example = { path = "../rmrk_catalog", default-features = false, features = ["ink-as-dependency"] }
+rmrk_equippable_lazy = { path = "../rmrk", default-features = false, features = ["ink-as-dependency"] }
+rmrk = { version = "0.6.0", git="https://github.com/rmrk-team/rmrk-ink", default-features = false }
+openbrush = { tag = "3.1.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = ["psp34", "ownable", "reentrancy_guard"] }
+
+[dev-dependencies]
+ink_e2e = "4.1.0"
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = ["std"]
+std = [
+    "ink/std",
+    "scale/std",
+    "scale-info/std",
+    "catalog_example/std",
+    "rmrk/std",
+    "rmrk_equippable_lazy/std",
+    "openbrush/std",
+]
+ink-as-dependency = []
+e2e-tests = []

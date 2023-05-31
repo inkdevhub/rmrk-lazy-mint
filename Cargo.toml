@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "rmrk_proxy",
+    "rmrk_catalog",
+    "rmrk",
+]
