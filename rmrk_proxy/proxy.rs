@@ -60,6 +60,15 @@ mod rmrk_proxy {
         proxy: crate::types::Data,
     }
 
+    /// Event emitted when token is minted.
+    #[ink(event)]
+    pub struct TokenMinted {
+        #[ink(topic)]
+        id: Id,
+        #[ink(topic)]
+        price: Option<Balance>,
+    }
+
     impl RmrkProxy {
         #[ink(constructor)]
         pub fn new(
@@ -81,7 +90,7 @@ mod rmrk_proxy {
         /// Mints a token on proxied RMRK contract.
         #[ink(message, payable)]
         #[modifiers(non_reentrant)]
-        pub fn mint(&mut self) -> Result<()> {
+        pub fn mint(&mut self) -> Result<Id> {
             const MAX_ASSETS: u32 = 255;
 
             let transferred_value = Self::env().transferred_value();
@@ -120,6 +129,7 @@ mod rmrk_proxy {
                 .map_err(|_| ProxyError::MintingError)?
                 .map_err(|_| ProxyError::MintingError)?;
 
+            // TODO make RMRK MintingLazy to return minted token Id.
             let token_id = build_call::<DefaultEnvironment>()
                 .call(self.proxy.rmrk_contract.unwrap())
                 .exec_input(ExecutionInput::new(Selector::new(ink::selector_bytes!(
@@ -160,7 +170,12 @@ mod rmrk_proxy {
                 .map_err(|_| ProxyError::OwnershipTransferError)?;
             transfer_token_result.map_err(|_| ProxyError::OwnershipTransferError)?;
 
-            Ok(())
+            self.env().emit_event(TokenMinted {
+                id: Id::U64(token_id),
+                price: Option::Some(self.proxy.mint_price),
+            });
+
+            Ok(Id::U64(token_id))
         }
 
         /// Gets a RMRK contract address.
