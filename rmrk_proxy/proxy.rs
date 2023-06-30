@@ -96,10 +96,10 @@ mod rmrk_proxy {
             let rmrk_contract = self.proxy.rmrk_contract.unwrap();
 
             let transferred_value = Self::env().transferred_value();
-            // ensure!(
-            //     transferred_value == self.proxy.mint_price,
-            //     ProxyError::BadMintValue
-            // );
+            ensure!(
+                transferred_value == self.proxy.mint_price,
+                ProxyError::BadMintValue
+            );
 
             let total_assets = build_call::<DefaultEnvironment>()
                 .call(rmrk_contract)
@@ -123,7 +123,6 @@ mod rmrk_proxy {
                 ))))
                 .returns::<core::result::Result<(), rmrk::errors::Error>>()
                 .try_invoke();
-            ink::env::debug_println!("mint_result: {:?}", mint_result);
 
             match mint_result {
                 // Handle environment errors.
@@ -321,7 +320,6 @@ mod rmrk_proxy {
         fn mint_fails_if_no_balance() {
             let mut contract = init_contract();
             let mint_result = contract.mint();
-            ink::env::debug_println!("mint result {:?}", mint_result);
             assert_eq!(mint_result, Err(ProxyError::BadMintValue));
         }
 
@@ -487,7 +485,6 @@ mod rmrk_proxy {
                 .await
                 .return_value()
                 .unwrap();
-            // ink::env::debug_println!("token assets: {:?}", read_total_assets_result);
             assert_eq!(read_total_assets_result.0, 1);
 
             // Check if token owner is same as the caller.
