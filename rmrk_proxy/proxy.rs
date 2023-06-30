@@ -24,7 +24,6 @@ mod rmrk_proxy {
     use crate::{
         ensure,
         ProxyError,
-        Result,
     };
     use ink::{
         env::{
@@ -35,8 +34,10 @@ mod rmrk_proxy {
             },
             hash,
             DefaultEnvironment,
+            Result as EnvResult,
         },
         prelude::vec::Vec,
+        MessageResult,
     };
     use openbrush::{
         contracts::{
@@ -90,17 +91,18 @@ mod rmrk_proxy {
         /// Mints a token on proxied RMRK contract.
         #[ink(message, payable)]
         #[modifiers(non_reentrant)]
-        pub fn mint(&mut self) -> Result<Id> {
+        pub fn mint(&mut self) -> Result<Id, ProxyError> {
             const MAX_ASSETS: u32 = 255;
+            let rmrk_contract = self.proxy.rmrk_contract.unwrap();
 
             let transferred_value = Self::env().transferred_value();
-            ensure!(
-                transferred_value == self.proxy.mint_price,
-                ProxyError::BadMintValue
-            );
+            // ensure!(
+            //     transferred_value == self.proxy.mint_price,
+            //     ProxyError::BadMintValue
+            // );
 
             let total_assets = build_call::<DefaultEnvironment>()
-                .call(self.proxy.rmrk_contract.unwrap())
+                .call(rmrk_contract)
                 .exec_input(ExecutionInput::new(Selector::new(ink::selector_bytes!(
                     "MultiAsset::total_assets"
                 ))))
@@ -110,28 +112,36 @@ mod rmrk_proxy {
                 .unwrap();
             ensure!(total_assets > 0, ProxyError::NoAssetsDefined);
             // This is temporary since current pseudo random generator is not working with big numbers.
-            ensure!(
-                total_assets <= MAX_ASSETS,
-                ProxyError::TooManyAssetsDefined
-            );
+            ensure!(total_assets <= MAX_ASSETS, ProxyError::TooManyAssetsDefined);
 
             // TODO check why the call is failing silently when no or invalid transferred value is provided.
             let mint_result = build_call::<DefaultEnvironment>()
-                .call(self.proxy.rmrk_contract.unwrap())
+                .call(rmrk_contract)
                 .transferred_value(transferred_value)
                 .exec_input(ExecutionInput::new(Selector::new(ink::selector_bytes!(
                     "MintingLazy::mint"
                 ))))
-                .returns::<()>()
+                .returns::<core::result::Result<(), rmrk::errors::Error>>()
                 .try_invoke();
             ink::env::debug_println!("mint_result: {:?}", mint_result);
-            mint_result
-                .map_err(|_| ProxyError::MintingError)?
-                .map_err(|_| ProxyError::MintingError)?;
+
+            match mint_result {
+                // Handle environment errors.
+                EnvResult::Err(_) => Err(ProxyError::EnvironmentError),
+                // Handle language errors.
+                EnvResult::Ok(MessageResult::Err(_)) => Err(ProxyError::LanguageError),
+                // Handle contract errors.
+                EnvResult::Ok(MessageResult::Ok(Result::<(), rmrk::errors::Error>::Err(_))) => {
+                    Err(ProxyError::RmrkError(
+                        mint_result.unwrap().unwrap().unwrap_err(),
+                    ))
+                }
+                _ => Ok(()),
+            }?;
 
             // TODO make RMRK MintingLazy to return minted token Id.
             let token_id = build_call::<DefaultEnvironment>()
-                .call(self.proxy.rmrk_contract.unwrap())
+                .call(rmrk_contract)
                 .exec_input(ExecutionInput::new(Selector::new(ink::selector_bytes!(
                     "PSP34::total_supply"
                 ))))
@@ -158,7 +168,7 @@ mod rmrk_proxy {
 
             let caller = Self::env().caller();
             let transfer_token_result = build_call::<DefaultEnvironment>()
-                .call(self.proxy.rmrk_contract.unwrap())
+                .call(rmrk_contract)
                 .exec_input(
                     ExecutionInput::new(Selector::new(ink::selector_bytes!("PSP34::transfer")))
                         .push_arg(caller)
@@ -170,10 +180,10 @@ mod rmrk_proxy {
                 .map_err(|_| ProxyError::OwnershipTransferError)?;
             transfer_token_result.map_err(|_| ProxyError::OwnershipTransferError)?;
 
-            self.env().emit_event(TokenMinted {
-                id: Id::U64(token_id),
-                price: Option::Some(self.proxy.mint_price),
-            });
+            // self.env().emit_event(TokenMinted {
+            //     id: Id::U64(token_id),
+            //     price: Option::Some(self.proxy.mint_price),
+            // });
 
             Ok(Id::U64(token_id))
         }
@@ -199,7 +209,10 @@ mod rmrk_proxy {
         /// Sets a RMRK contract address.
         #[ink(message)]
         #[modifiers(only_owner)]
-        pub fn set_rmrk_contract_address(&mut self, new_contract_address: AccountId) -> Result<()> {
+        pub fn set_rmrk_contract_address(
+            &mut self,
+            new_contract_address: AccountId,
+        ) -> Result<(), ProxyError> {
             self.proxy.rmrk_contract = Option::Some(new_contract_address);
             Ok(())
         }
@@ -210,7 +223,7 @@ mod rmrk_proxy {
         pub fn set_catalog_contract_address(
             &mut self,
             new_contract_address: AccountId,
-        ) -> Result<()> {
+        ) -> Result<(), ProxyError> {
             self.proxy.catalog_contract = Option::Some(new_contract_address);
             Ok(())
         }
@@ -218,7 +231,7 @@ mod rmrk_proxy {
         /// Sets a minting price.
         #[ink(message)]
         #[modifiers(only_owner)]
-        pub fn set_mint_price(&mut self, new_mint_price: Balance) -> Result<()> {
+        pub fn set_mint_price(&mut self, new_mint_price: Balance) -> Result<(), ProxyError> {
             self.proxy.mint_price = new_mint_price;
             Ok(())
         }
@@ -307,7 +320,9 @@ mod rmrk_proxy {
         #[ink::test]
         fn mint_fails_if_no_balance() {
             let mut contract = init_contract();
-            assert_eq!(contract.mint(), Err(ProxyError::BadMintValue));
+            let mint_result = contract.mint();
+            ink::env::debug_println!("mint result {:?}", mint_result);
+            assert_eq!(mint_result, Err(ProxyError::BadMintValue));
         }
 
         fn init_contract() -> RmrkProxy {
