@@ -111,10 +111,9 @@ mod rmrk_proxy {
                 .unwrap()
                 .unwrap();
             ensure!(total_assets > 0, ProxyError::NoAssetsDefined);
-            // This is temporary since current pseudo random generator is not working with big numbers.
+            // TODO This is temporary since current pseudo random generator is not working with big numbers.
             ensure!(total_assets <= MAX_ASSETS, ProxyError::TooManyAssetsDefined);
 
-            // TODO check why the call is failing silently when no or invalid transferred value is provided.
             let mint_result = build_call::<DefaultEnvironment>()
                 .call(rmrk_contract)
                 .transferred_value(transferred_value)
@@ -178,11 +177,6 @@ mod rmrk_proxy {
                 .try_invoke()
                 .map_err(|_| ProxyError::OwnershipTransferError)?;
             transfer_token_result.map_err(|_| ProxyError::OwnershipTransferError)?;
-
-            // self.env().emit_event(TokenMinted {
-            //     id: Id::U64(token_id),
-            //     price: Option::Some(self.proxy.mint_price),
-            // });
 
             Ok(Id::U64(token_id))
         }

@@ -81,11 +81,6 @@ pub mod catalog_example {
 
         #[ink::test]
         fn add_parts_to_catalog_works() {
-            // const ASSET_URI: &str = "asset_uri/";
-            // const ASSET_ID: AssetId = 1;
-            // const TOKEN_ID1: Id = Id::U64(1);
-            // const TOKEN_ID2: Id = Id::U64(2);
-
             // Create 2 parts,
             // The first is equippable and can accept 2 equipment from 2 contracts
             // The second is fixed and can't accept any equipment

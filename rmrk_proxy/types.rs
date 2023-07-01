@@ -44,6 +44,7 @@ pub enum ProxyError {
     OwnableError(OwnableError),
     /// Error happened while trying to transfer minted token ownership to a caller.
     OwnershipTransferError,
+    /// PSP34 contract error.
     PSP34(PSP34Error),
     /// A caller is trying to make second call while 1st one is still executing.
     ReentrancyError(ReentrancyGuardError),
@@ -53,9 +54,6 @@ pub enum ProxyError {
     /// where get_pseudo_random function returns u8.
     TooManyAssetsDefined,
 }
-
-// pub type Result<T> = core::result::Result<T, ProxyError>;
-// pub type RmrkResult<T> = core::result::Result<T, RmrkError>;
 
 impl From<OwnableError> for ProxyError {
     fn from(error: OwnableError) -> Self {
